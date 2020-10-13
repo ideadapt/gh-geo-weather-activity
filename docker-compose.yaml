@@ -1,0 +1,30 @@
+version: '3.1'
+
+services:
+
+  db:
+    container_name: gh-analysis-db
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: github
+      POSTGRES_DB: github
+      POSTGRES_PASSWORD: 1234
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - type: bind
+        source: ./data
+        read_only: true
+        target: /tmp/input
+
+  adminer:
+    container_name: gh-analysis-adminer
+    image: adminer
+    restart: always
+    ports:
+      - 7070:8080
+
+volumes:
+  dbdata:

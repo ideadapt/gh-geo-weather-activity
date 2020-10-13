@@ -3,6 +3,7 @@ import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.github.cdimascio.dotenv.dotenv
 import io.github.rybalkinsd.kohttp.dsl.context.ParamContext
 import io.github.rybalkinsd.kohttp.dsl.httpGet
 import io.github.rybalkinsd.kohttp.ext.url
@@ -17,14 +18,12 @@ import java.nio.file.Path
 
 fun main(args: Array<String>) {
     /*
-    gh-push-weather
-        for push in gh-archive
-            ghLocation = getUserLocation(push)
-            noaaLocation = getConnectedLocation(ghLocation)
+    gh-event-weather-scraper
+        for push in pushs_per_day
             dailyWeather = noaa.getWeather(noaaLocation, push.date)
             dump(dailyWeather, push, noaaLocation)
 
-    gh-activity-weather
+    gh-weather-stats
         measure push frequency e.g. per day per region.
         add weather info to each measurement
      */
@@ -34,7 +33,8 @@ fun main(args: Array<String>) {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).build()
 
-    val token = "rZIxWMEzxVaSvdruxVjRxiFwvWPkFvCI"
+    val env = dotenv()
+    val token = env.get("GH_NOAA_TOKEN")
     val baseUrl = "https://www.ncdc.noaa.gov/cdo-web/api/v2/"
 
     fun query(path: String, params: ParamContext.() -> Unit): Response {

@@ -15,6 +15,7 @@ dependencies {
     testImplementation(kotlin("test-junit5"))
     implementation(group = "io.github.rybalkinsd", name = "kohttp-jackson", version = "0.12.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.+")
+    compile("io.github.cdimascio:dotenv-kotlin:6.2.1")
 }
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "1.8"

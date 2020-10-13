@@ -63,3 +63,12 @@ FROM events e
          FULL JOIN cities_in_profiles ci ON ci.profile_location = u.location
 WHERE co.n_id IS NOT NULL OR ci.n_id IS NOT NULL
 ;
+
+------------------------------------------------------------------------------------------------------------------------
+
+CREATE MATERIALIZED VIEW pushs_per_day AS
+select date_trunc('day', createdat) as day, count(id) count, country, country_nid, city, city_nid
+from events_geocoded
+where type = 'PushEvent'
+group by day, country, city, city_nid, country_nid
+;

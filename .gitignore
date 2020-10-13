@@ -3,6 +3,8 @@ data/dump.sql.gz
 data/gh-archive/
 build/
 
+/.env
+
 .gradle
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)

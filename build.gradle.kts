@@ -18,6 +18,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.+")
     implementation("io.github.cdimascio:dotenv-kotlin:6.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3")
+    implementation("org.postgresql:postgresql:42.2.17.jre7")
 }
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "1.8"

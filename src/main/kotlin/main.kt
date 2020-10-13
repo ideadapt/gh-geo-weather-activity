@@ -4,11 +4,6 @@ import kotlinx.cli.required
 
 fun main(args: Array<String>) {
     /*
-    gh-event-weather-scraper
-        for push in pushs_per_day
-            dailyWeather = noaa.getWeather(noaaLocation, push.date)
-            dump(dailyWeather, push, noaaLocation)
-
     gh-weather-stats
         measure push frequency e.g. per day per region.
         add weather info to each measurement
@@ -20,7 +15,7 @@ fun main(args: Array<String>) {
         fullName = "script",
         description = """Sub routine to run. One of:
             |   noaa-location-scraper   
-            |   gh-event-weather-scraper
+            |   event-weather-scraper
             |   
         """.trimMargin()
     ).required()
@@ -31,7 +26,8 @@ fun main(args: Array<String>) {
             NoaaLocationScraper().start()
         }
 
-        "gh-event-weather-scraper" -> {
+        "event-weather-scraper" -> {
+            EventWeatherScraper().start()
         }
 
         else -> {

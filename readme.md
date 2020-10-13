@@ -7,17 +7,16 @@ docker exec -i pg-github-analysis psql -U github -d github < schema.sql
 
 # GO PROJECT:
 
-install go
+- install go
+
 ````shell script
 go get github.com/benfred/github-analysis
 cd $GOPATH/src/github.com/benfred/github-analysis
 go install
 ````
-fix int64 errors => TODO created fixed fork
-
-`go install`
-
-`./build.sh`
+- fix int64 errors => TODO created fixed fork
+- `go install`
+- `./build.sh`
 
 ## download raw github archive data
 `$GOPATH/bin/gha-download-files`
@@ -56,7 +55,8 @@ $GOPATH/bin/gha-location-scraper
 
 
 # THIS REPO:
-(depends on location-scraper)
+NOAA cities and countries are stored as json files in data directory.
+Refresh them by running this projects main class.
 
 ````shell script
 docker exec -i gh-analysis-db psql -U github -d github < data/import-countries-json.sql

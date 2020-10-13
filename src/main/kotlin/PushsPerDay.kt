@@ -8,4 +8,17 @@ data class PushsPerDay(
     val country_nid: String,
     val city_nid: String
 ) {
+    val locationId: String by lazy {
+        when (city_nid.isEmpty()) {
+            true -> country_nid
+            else -> city_nid
+        }
+    }
+
+    val locationName: String by lazy {
+        when (city.isEmpty()) {
+            true -> country
+            else -> city
+        }
+    }
 }

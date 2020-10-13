@@ -1,12 +1,10 @@
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flatMapConcat
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
 import java.sql.Connection
+import java.sql.Date
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
 import java.util.*
@@ -15,6 +13,17 @@ import java.util.*
 class EventWeatherScraper {
     private val noaaClient = NoaaClient()
     private val env = dotenv()
+    private val conn: Connection by lazy {
+        val host = env.get("DB_HOST")
+        val db = env.get("DB_NAME")
+        val port = env.get("DB_PORT", "5432")
+        val url = "jdbc:postgresql://$host:$port/$db"
+        val props = Properties()
+        props.setProperty("user", env.get("DB_USER"))
+        props.setProperty("password", env.get("DB_PASSWORD"))
+
+        DriverManager.getConnection(url, props)
+    }
 
     @FlowPreview
     fun start() {
@@ -26,40 +35,45 @@ class EventWeatherScraper {
         runBlocking {
             readEvents().flatMapConcat { event ->
 
-                val locationId = when (event.city_nid.isEmpty()) {
-                    true -> event.country_nid
-                    else -> event.city_nid
-                }
-
+                // NCDC quota is max 5 req/s, we do 4 to stay safe
                 delay(250)
 
-                println("\n# Weather for $locationId\n")
+                println("\n# Weather for ${event.locationId}\n")
 
-                noaaClient.queryAsync("data", Weather::class.java) {
+                val response = noaaClient.queryAsync("data", Weather::class.java) {
                     "datasetid" to "GHCND"
-                    "locationid" to locationId
+                    "locationid" to event.locationId
                     "units" to "metric"
-                    "limit" to "200"
+                    "limit" to "25"
                     "startdate" to SimpleDateFormat("yyyy-MM-dd").format(event.day)
                     "enddate" to SimpleDateFormat("yyyy-MM-dd").format(event.day)
                 }
-            }.collect { page ->
-                println(page.results.take(2))
+
+                flowOf(event).zip(response) { e, r ->
+                    e to r
+                }
+            }.onEach { (event, page) ->
+                println(page.results.size.toString() + " " + page.results.take(10))
+            }.collect { (event, page) ->
+                val format = SimpleDateFormat("yyyy-MM-dd")
+
+                page.results.forEach {
+                    val sql =
+                        "insert into location_weather (day, datatype, value, location_name, location_id) values (?, ?, ?, ?, ?);"
+                    val insert = conn.prepareStatement(sql)
+                    insert.setDate(1, Date.valueOf(format.format(it.date)))
+                    insert.setString(2, it.datatype)
+                    insert.setDouble(3, it.value)
+                    insert.setString(4, event.locationName)
+                    insert.setString(5, event.locationId)
+                    insert.executeUpdate()
+                }
             }
         }
     }
 
     private fun readEvents(): Flow<PushsPerDay> {
-        val host = env.get("DB_HOST")
-        val db = env.get("DB_NAME")
-        val port = env.get("DB_PORT", "5432")
-        val url = "jdbc:postgresql://$host:$port/$db"
-        val props = Properties()
-        props.setProperty("user", env.get("DB_USER"))
-        props.setProperty("password", env.get("DB_PASSWORD"))
-
-        val conn: Connection = DriverManager.getConnection(url, props)!!
-        val result = conn.createStatement().executeQuery("select * from pushs_per_day limit 10;")
+        val result = conn.createStatement().executeQuery("select * from pushs_per_day limit 200;")
         val format = SimpleDateFormat("yyyy-MM-dd hh:mm:ss")
 
         return flow {

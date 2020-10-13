@@ -15,6 +15,17 @@ CREATE TABLE events
 CREATE INDEX events_type_index ON events(type);
 CREATE INDEX events_userID_index ON events(userid);
 
+create table location_weather(
+    id int generated always as identity,
+    datatype varchar(10),
+    day timestamp without time zone,
+    value numeric(7, 2),
+    location_name varchar(100),
+    location_id varchar(20),
+    PRIMARY KEY(id)
+);
+
+
 CREATE TABLE repos
 (
   id bigint PRIMARY KEY,

@@ -7,6 +7,9 @@ fun main(args: Array<String>) {
     gh-weather-stats
         measure push frequency e.g. per day per region.
         add weather info to each measurement
+
+Wieviel events können von google geocoded werden? 276k von 8.7mio
+Wieviel geocoded events können einer noaa location zugeordnet werden?
      */
 
     val parser = ArgParser("gh-geo-weather-activity")

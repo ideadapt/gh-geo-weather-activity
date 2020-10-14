@@ -58,6 +58,7 @@ class EventWeatherScraper {
                 val format = SimpleDateFormat("yyyy-MM-dd")
 
                 page.results.forEach {
+                    // TODO skip duplicates
                     val sql =
                         "insert into location_weather (day, datatype, value, location_name, location_id) values (?, ?, ?, ?, ?);"
                     val insert = conn.prepareStatement(sql)

@@ -8,8 +8,21 @@ fun main(args: Array<String>) {
         measure push frequency e.g. per day per region.
         add weather info to each measurement
 
-Wieviel events können von google geocoded werden? 276k von 8.7mio
-Wieviel geocoded events können einer noaa location zugeordnet werden?
+Wieviel locations können von google geocoded werden?
+    select data, count(*) c from locations group by data order by c desc
+    4100 von 4617 aka 90%. ok.
+Wieviel google geocoded locations können einer noaa location zugeordnet werden?
+    178+93=270 von 4100 aka 6.5%. nok.
+    => geocoded location müsste einer best match noaa location zugeordnet werden (z.B: umkreis, state, countries)
+
+    geocoded cities mit join => 178
+    geocoded cities ohne join => 667
+
+    geocoded countries mit join => 93
+    geocoded countries ohne join => 139
+
+    auch ohne join zu noaa werden erst 139+667=800 geocoded locations als country/city eingestuft (von total 4100)
+    ... kann das sein?
      */
 
     val parser = ArgParser("gh-geo-weather-activity")

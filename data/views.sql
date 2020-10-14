@@ -1,47 +1,48 @@
--- ALL COUNTRIES IN GH PROFILES
+-- ALL GH PROFILE COUNTRIES THAT ARE NOAA COUNTRIES
+
 REFRESH MATERIALIZED VIEW countries_in_profiles;
 CREATE MATERIALIZED VIEW countries_in_profiles
 AS
-SELECT addr.profile_location,
-       addr.comp,
-       addr.shortname,
-       nct.country_id AS n_shortname,
-       nct.id AS n_id
-FROM (SELECT l.location AS profile_location,
-             l.data #> '{0,address_components}'::text[] AS comp,
-             btrim((l.data #> '{0,address_components,0,short_name}'::text[])::text, '"'::text) AS shortname
-      FROM locations l) addr
-         JOIN (SELECT nc.id,
-                      substr(nc.id, 6, 2) AS country_id,
-                      nc.name
-               FROM countries_typed_view nc) nct ON nct.country_id = addr.shortname
+SELECT
+    DISTINCT ON (addr.shortname) addr.shortname,
+                                 addr.profile_location,
+                                 addr.comp,
+                                 addr.shortname,
+                                 nct.country_id AS n_shortname,
+                                 nct.id AS n_id
 
-WHERE addr.comp @> '[{"types": ["country"]}]'::jsonb
-  AND jsonb_array_length(addr.comp) = 1
+FROM ( SELECT l.location AS profile_location,
+              l.data #> '{0,address_components}'::text[] AS comp,
+              btrim((l.data #> '{0,address_components,0,short_name}'::text[])::text, '"'::text) AS shortname
+       FROM locations l) addr
+         JOIN ( SELECT nc.id,
+                       substr(nc.id, 6, 2) AS country_id,
+                       nc.name
+                FROM countries_typed_view nc) nct ON nct.country_id = addr.shortname
+WHERE addr.comp @> '[{"types": ["country"]}]'::jsonb AND jsonb_array_length(addr.comp) = 1
 ;
 
 
 ------------------------------------------------------------------------------------------------------------------------
 
--- ALL CITIES IN GH PROFILES
+-- ALL GH PROFILE CITIES THAT ARE NOAA CITIES
 REFRESH MATERIALIZED VIEW cities_in_profiles;
 CREATE MATERIALIZED VIEW cities_in_profiles
 AS
-SELECT addr.profile_location,
-       addr.comp,
-       addr.shortname,
-       nct.city_name AS n_name,
-       nct.id AS n_id
-FROM (SELECT l.location AS profile_location,
-             l.data #> '{0,address_components}'::text[] AS comp,
-             btrim((l.data #> '{0,address_components,0,short_name}'::text[])::text, '"'::text) AS shortname
-      FROM locations l) addr
-         JOIN (SELECT nc.id,
-                      substr(nc.name, 0, "position"(nc.name, ', '::text)) AS city_name,
-                      nc.name
-               FROM cities_typed_view nc) nct ON nct.city_name = addr.shortname
-WHERE addr.comp @> '[{"types": ["administrative_area_level_1"]}]'::jsonb
-  AND jsonb_array_length(addr.comp) = 3
+SELECT DISTINCT ON(nct.id) nct.id AS n_id,
+                           addr.profile_location,
+                           addr.comp,
+                           addr.shortname,
+                           nct.city_name AS n_name
+FROM ( SELECT l.location AS profile_location,
+              l.data #> '{0,address_components}'::text[] AS comp,
+              btrim((l.data #> '{0,address_components,0,short_name}'::text[])::text, '"'::text) AS shortname
+       FROM locations l) addr
+         JOIN ( SELECT nc.id,
+                       substr(nc.name, 0, "position"(nc.name, ', '::text)) AS city_name,
+                       nc.name
+                FROM cities_typed_view nc) nct ON nct.city_name = addr.shortname
+WHERE addr.comp @> '[{"types": ["administrative_area_level_1"]}]'::jsonb AND jsonb_array_length(addr.comp) = 3
 ;
 
 ------------------------------------------------------------------------------------------------------------------------

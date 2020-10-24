@@ -15,14 +15,13 @@ Wieviel google geocoded locations können einer noaa location zugeordnet werden?
     178+93=270 von 4100 aka 6.5%. nok.
     => geocoded location müsste einer best match noaa location zugeordnet werden (z.B: umkreis, state, countries)
 
-    geocoded cities mit join => 178
-    geocoded cities ohne join => 667
+    geocoded cities mit join => 777
+    geocoded cities ohne join => 4091
 
     geocoded countries mit join => 93
     geocoded countries ohne join => 139
 
-    auch ohne join zu noaa werden erst 139+667=800 geocoded locations als country/city eingestuft (von total 4100)
-    ... kann das sein?
+    => ohne join zu noaa werden 4091+139=4230 geocoded locations als country+city eingestuft (von total 4300). ok.
      */
 
     val parser = ArgParser("gh-geo-weather-activity")

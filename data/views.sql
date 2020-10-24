@@ -29,11 +29,11 @@ WHERE addr.comp @> '[{"types": ["country"]}]'::jsonb AND jsonb_array_length(addr
 REFRESH MATERIALIZED VIEW cities_in_profiles;
 CREATE MATERIALIZED VIEW cities_in_profiles
 AS
-SELECT DISTINCT ON(nct.id) nct.id AS n_id,
-                           addr.profile_location,
-                           addr.comp,
-                           addr.shortname,
-                           nct.city_name AS n_name
+SELECT DISTINCT ON (nct.id) nct.id AS n_id,
+                            addr.profile_location,
+                            addr.comp,
+                            addr.shortname,
+                            nct.city_name AS n_name
 FROM ( SELECT l.location AS profile_location,
               l.data #> '{0,address_components}'::text[] AS comp,
               btrim((l.data #> '{0,address_components,0,short_name}'::text[])::text, '"'::text) AS shortname
@@ -42,11 +42,14 @@ FROM ( SELECT l.location AS profile_location,
                        substr(nc.name, 0, "position"(nc.name, ', '::text)) AS city_name,
                        nc.name
                 FROM cities_typed_view nc) nct ON nct.city_name = addr.shortname
-WHERE addr.comp @> '[{"types": ["administrative_area_level_1"]}]'::jsonb AND jsonb_array_length(addr.comp) = 3
+WHERE addr.comp @> '[{"types": ["administrative_area_level_1"]}]'::jsonb
+  AND NOT addr.comp @> '[{"types": ["administrative_area_level_5"]}]'::jsonb
 ;
+
 
 ------------------------------------------------------------------------------------------------------------------------
 
+-- ADD NOAA LOCATION FOR EACH EVENT
 CREATE OR REPLACE VIEW events_geocoded
 AS
 SELECT e.id,
@@ -65,8 +68,10 @@ FROM events e
 WHERE co.n_id IS NOT NULL OR ci.n_id IS NOT NULL
 ;
 
+
 ------------------------------------------------------------------------------------------------------------------------
 
+-- GROUP EVENTS BY DAY AND NOAA LOCATION
 CREATE MATERIALIZED VIEW pushs_per_day AS
 select date_trunc('day', createdat) as day, count(id) count, country, country_nid, city, city_nid
 from events_geocoded

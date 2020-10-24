@@ -54,27 +54,47 @@ class EventWeatherScraper {
                 }
             }.onEach { (event, page) ->
                 println(page.results.size.toString() + " " + page.results.take(10))
-            }.collect { (event, page) ->
+            }.map { (event, page) ->
+                event to listOf(
+                    (page.results.firstOrNull { it.datatype == "PRCP" } ?: Weather(
+                        datatype = "PRCP",
+                        date = event.day,
+                        station = "",
+                        value = Double.NaN
+                    )),
+                    (page.results.firstOrNull { it.datatype == "TAVG" }) ?: Weather(
+                        datatype = "TAVG",
+                        date = event.day,
+                        station = "",
+                        value = Double.NaN
+                    )
+                )
+            }.collect { (event, measurements) ->
                 val format = SimpleDateFormat("yyyy-MM-dd")
 
-                page.results.forEach {
-                    // TODO skip duplicates
+                measurements.forEach {
                     val sql =
-                        "insert into location_weather (day, datatype, value, location_name, location_id) values (?, ?, ?, ?, ?);"
+                        """
+                        INSERT INTO location_weather (day, datatype, value, location_name, location_id) VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT ON CONSTRAINT location_day 
+                        DO NOTHING;
+                        """.trimIndent()
                     val insert = conn.prepareStatement(sql)
                     insert.setDate(1, Date.valueOf(format.format(it.date)))
                     insert.setString(2, it.datatype)
                     insert.setDouble(3, it.value)
                     insert.setString(4, event.locationName)
                     insert.setString(5, event.locationId)
-                    insert.executeUpdate()
+                    val affected = insert.executeUpdate()
+                    println("affected $affected")
                 }
             }
         }
     }
 
     private fun readEvents(): Flow<PushsPerDay> {
-        val result = conn.createStatement().executeQuery("select * from pushs_per_day limit 200;")
+        // TODO auto retrieve offset from db if parameterized
+        val result = conn.createStatement().executeQuery("select * from pushs_per_day offset 200;")
         val format = SimpleDateFormat("yyyy-MM-dd hh:mm:ss")
 
         return flow {

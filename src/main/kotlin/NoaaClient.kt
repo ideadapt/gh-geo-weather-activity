@@ -1,5 +1,8 @@
 import com.fasterxml.jackson.databind.JavaType
 import io.github.cdimascio.dotenv.dotenv
+import io.github.rybalkinsd.kohttp.client.client
+import io.github.rybalkinsd.kohttp.client.defaultHttpClient
+import io.github.rybalkinsd.kohttp.client.fork
 import io.github.rybalkinsd.kohttp.dsl.context.ParamContext
 import io.github.rybalkinsd.kohttp.dsl.httpGet
 import io.github.rybalkinsd.kohttp.ext.url
@@ -14,7 +17,9 @@ class NoaaClient {
     private val token = env.get("GH_NOAA_TOKEN")
 
     private fun query(path: String, params: ParamContext.() -> Unit): Response {
-        return httpGet {
+        return httpGet(client {
+            readTimeout = 15_000
+        }) {
             url(baseUrl + path)
             param(params)
             header {

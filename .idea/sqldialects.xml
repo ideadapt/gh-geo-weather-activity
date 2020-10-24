@@ -4,6 +4,7 @@
     <file url="file://$PROJECT_DIR$/data/db.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/data/import-cities-json.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/data/import-countries-json.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/data/schema.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/data/views.sql" dialect="PostgreSQL" />
   </component>
 </project>

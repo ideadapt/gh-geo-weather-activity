@@ -30,17 +30,17 @@ go run cmd/gha-parse-githubarchive/main.go \
     -path /Users/ueli/repos/gh-geo-activity/data/gh-archive
 ```
 
-## Drop and recreate using schema OR just truncate
+## optional: Drop and recreate using schema OR just truncate
 ```shell script
 docker exec -i gh-analysis-db psql -U github -d github -c "DROP TABLE events;"
 docker exec -i gh-analysis-db psql -U github -d github < data/schema.sql
 ```
 
-### Import all tsv data into event table
+### import all tsv data into event table
 `./import-gh-archive-tsv.sh`
 
 
-## get infos via api von github, depends on tsv
+## get user details via github api, depends on tsv
 ```shell script
 go run cmd/gha-user-scraper/main.go \
     -filename /Users/ueli/repos/gh-geo-activity/data/gh-archive/2020/01/01/parsed_events.tsv

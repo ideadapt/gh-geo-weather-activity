@@ -1,14 +1,15 @@
+package infra
+
 import com.fasterxml.jackson.databind.JavaType
 import io.github.cdimascio.dotenv.dotenv
 import io.github.rybalkinsd.kohttp.client.client
-import io.github.rybalkinsd.kohttp.client.defaultHttpClient
-import io.github.rybalkinsd.kohttp.client.fork
 import io.github.rybalkinsd.kohttp.dsl.context.ParamContext
 import io.github.rybalkinsd.kohttp.dsl.httpGet
 import io.github.rybalkinsd.kohttp.ext.url
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import model.NoaaResponse
 import okhttp3.Response
 
 class NoaaClient {

@@ -1,8 +1,10 @@
+package model
+
 data class ResultSet(
     val count: Int,
     val limit: Int,
     val offset: Int
-){
+) {
 }
 
 data class NoaaResponse<T>(

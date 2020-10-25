@@ -1,8 +1,13 @@
 import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.required
+import tasks.EventWeatherScraper
+import tasks.GithubUserScraper
+import tasks.NoaaLocationScraper
+import kotlin.time.ExperimentalTime
 
-fun main(args: Array<String>) {
+@ExperimentalTime
+suspend fun main(args: Array<String>) {
     /*
     gh-weather-stats
         measure push frequency e.g. per day per region.
@@ -43,6 +48,10 @@ Wieviel google geocoded locations können einer noaa location zugeordnet werden?
 
         "event-weather-scraper" -> {
             EventWeatherScraper().start()
+        }
+
+        "github-user-scraper" -> {
+            GithubUserScraper().start()
         }
 
         else -> {

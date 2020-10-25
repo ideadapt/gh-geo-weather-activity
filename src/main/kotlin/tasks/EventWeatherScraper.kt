@@ -1,15 +1,22 @@
+package tasks
+
+import infra.NoaaClient
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
+import model.PushsPerDay
+import model.Weather
 import java.sql.Connection
 import java.sql.Date
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
 import java.util.*
 
-
+/**
+ * Store noaa weather data for each event (based location of user that created the event)
+ */
 class EventWeatherScraper {
     private val noaaClient = NoaaClient()
     private val env = dotenv()
@@ -38,7 +45,7 @@ class EventWeatherScraper {
                 // NCDC quota is max 5 req/s, we do 4 to stay safe
                 delay(250)
 
-                println("\n# Weather for ${event.locationId}\n")
+                println("\n# model.Weather for ${event.locationId}\n")
 
                 val response = noaaClient.queryAsync("data", Weather::class.java) {
                     "datasetid" to "GHCND"

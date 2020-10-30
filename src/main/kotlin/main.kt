@@ -2,7 +2,7 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.required
 import tasks.EventWeatherScraper
-import tasks.GithubUserScraper
+import tasks.GithubUserLocationScraper
 import tasks.NoaaLocationScraper
 import kotlin.time.ExperimentalTime
 
@@ -36,7 +36,7 @@ Wieviel google geocoded locations können einer noaa location zugeordnet werden?
         description = """Sub routine to run. One of:
             |   noaa-location-scraper   
             |   event-weather-scraper
-            |   
+            |   github-user-location-scraper
         """.trimMargin()
     ).required()
     parser.parse(args)
@@ -50,8 +50,8 @@ Wieviel google geocoded locations können einer noaa location zugeordnet werden?
             EventWeatherScraper().start()
         }
 
-        "github-user-scraper" -> {
-            GithubUserScraper().start()
+        "github-user-location-scraper" -> {
+            GithubUserLocationScraper().start()
         }
 
         else -> {

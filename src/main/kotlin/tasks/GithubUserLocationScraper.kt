@@ -10,15 +10,16 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
 import model.RateLimit
 import model.User
+import java.math.RoundingMode
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.time.Instant
 import java.util.*
 import kotlin.time.ExperimentalTime
-import kotlin.time.seconds
+import kotlin.time.milliseconds
 
-class GithubUserScraper {
+class GithubUserLocationScraper {
     private val env = dotenv()
     private val conn: Connection by lazy {
         val host = env.get("DB_HOST")
@@ -37,23 +38,46 @@ class GithubUserScraper {
     fun start() {
         runBlocking {
             var idx = 0
+            var startTime: Instant? = null
+            val throughputMeasureInterval = 30
+            println("reading events with incomplete user data …")
+
             readCandidates()
                 .flatMapMerge { result ->
                     checkRateLimit(++idx)
 
+                    if (idx == 1) {
+                        println("start fetching")
+                        startTime = Instant.now()
+                    }
+
+                    if (idx % throughputMeasureInterval == 0) {
+                        val diff4Ten = Instant.now().minusMillis(startTime!!.toEpochMilli()).toEpochMilli()
+                        val throughput = throughputMeasureInterval.toDouble() / diff4Ten * 1000.0
+                        println("${throughput.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)} users/sec")
+                        startTime = Instant.now()
+                    }
+
                     val userData = fetchUser(result.getString("username"))
-                    if (userData.location.isNullOrEmpty()) {
-                        println("skip ${userData.login}, no location set")
-                        flowOf(null)
-                    } else {
-                        flowOf(userData)
+
+                    when {
+                        userData == null -> {
+                            flowOf(null)
+                        }
+                        userData.location.isNullOrEmpty() -> {
+                            // println("skip ${userData.login}, no location set")
+                            flowOf(null)
+                        }
+                        else -> {
+                            flowOf(userData)
+                        }
                     }
                 }
                 .filterNotNull()
                 .collect { user ->
                     val insertCount = storeUser(user)
                     if (insertCount > 0) {
-                        println("stored ${user}")
+                        println("stored $user")
                     }
                 }
         }
@@ -61,11 +85,17 @@ class GithubUserScraper {
 
     @FlowPreview
     private fun readCandidates(): Flow<ResultSet> {
+        // all events with no or incomplete user
         val query = conn.prepareStatement(
             """
-           select (date_trunc('day', createdat))::timestamp, userid, username from events
-           where type = 'PushEvent'
-           group by 1, userid, username limit 100
+select e1.userid, e1.username, u1.login stored_login, u1.id stored_userid, u1.location from 
+	(select e.userid, e.username from events e
+	 	where e.type = 'PushEvent'
+		group by e.userid, e.username) e1
+left outer join 
+	(select u.id::text as id, u.login, u.location from users u) u1 
+on u1.id = e1.userid
+where u1.location is null
         """.trimIndent()
         )
 
@@ -79,8 +109,8 @@ class GithubUserScraper {
 
     @ExperimentalTime
     private suspend fun checkRateLimit(idx: Int) {
-        // only do for every tenth
-        if (idx % 10 != 0) {
+        val firstOrTenth = idx == 1 || idx % 10 == 0
+        if (!firstOrTenth) {
             return
         }
 
@@ -88,7 +118,7 @@ class GithubUserScraper {
             url("https://api.github.com/rate_limit")
             header {
                 "Accept" to "application/vnd.github.v3+json"
-                "Authorization" to "token " + env.get("GH_API_TOKEN")
+                "Authorization" to "token ${env.get("GH_API_TOKEN")}"
             }
         }
 
@@ -100,17 +130,19 @@ class GithubUserScraper {
 
         val coreRateLimit = data.resources["core"]!!
         if (coreRateLimit.remaining < 250) {
-            val delayMillis = Instant.ofEpochMilli(coreRateLimit.reset)
+            println(coreRateLimit)
+            val delayMillis = Instant.ofEpochSecond(coreRateLimit.reset)
                 .minusMillis(Instant.now().toEpochMilli())
                 .toEpochMilli()
-            println("wait for ${delayMillis.seconds}")
+            println("wait for ${delayMillis.milliseconds}")
             delay(delayMillis)
-        } else {
-            println("remaining requests ${coreRateLimit.remaining}")
         }
+//        else {
+//            println("remaining requests ${coreRateLimit.remaining}")
+//        }
     }
 
-    private fun fetchUser(username: String): User {
+    private fun fetchUser(username: String): User? {
 
         val userResponse = httpGet {
             url("https://api.github.com/users/$username")
@@ -121,7 +153,12 @@ class GithubUserScraper {
         }
 
         if (!userResponse.isSuccessful) {
-            throw IllegalStateException("users request failed: " + userResponse.code())
+            if (userResponse.code() == 404) {
+                println("user $username does not exist anymore")
+                return null
+            }
+
+            throw IllegalStateException("github users api request failed: " + userResponse.code())
         }
 
         return JacksonMapper.get().readValue(userResponse.body()?.string(), User::class.java);
@@ -131,12 +168,14 @@ class GithubUserScraper {
         val command = conn.prepareStatement(
             """
             INSERT INTO users (id, login, location) VALUES (?, ?, ?)
-                ON CONFLICT(id) DO NOTHING;
+                ON CONFLICT(id) DO
+                    UPDATE SET location = ?;
             """.trimIndent()
         )
         command.setInt(1, user.id)
         command.setString(2, user.login)
         command.setString(3, user.location)
+        command.setString(4, user.location)
         //            command.setDate(4, Date.valueOf(Instant.now().atZone(ZoneId.systemDefault()).toLocalDate()))
         //            command.setInt(5, userResponse.code())
         return command.executeUpdate()

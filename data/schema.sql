@@ -48,6 +48,8 @@ CREATE TABLE repos
   statuscode integer
 );
 
+CREATE INDEX repos_name_index ON repos (name);
+
 CREATE TABLE users
 (
   id integer PRIMARY KEY,
@@ -64,8 +66,12 @@ CREATE TABLE users
   created timestamp without time zone,
   modified timestamp without time zone,
   fetched timestamp without time zone,
-  statuscode integer
+  statuscode integer,
+  CONSTRAINT uniq_login UNIQUE (login)
 );
+
+CREATE INDEX users_login_index ON users(login);
+
 
 CREATE TABLE organization_members
 (
@@ -74,7 +80,6 @@ CREATE TABLE organization_members
   fetched timestamp without time zone,
   statuscode integer
 );
-
 CREATE TABLE locations
 (
   location text PRIMARY KEY,
@@ -84,11 +89,6 @@ CREATE TABLE locations
   state text,
   country text
 );
-
-
-
-CREATE INDEX repos_name_index ON repos (name);
-CREATE INDEX users_login_index ON users(login);
 
 /* migrations: TODO: proper up/down
 alter table repos add column license text;

@@ -14,6 +14,7 @@ CREATE TABLE events
 );
 CREATE INDEX events_type_index ON events(type);
 CREATE INDEX events_userID_index ON events(userid);
+CREATE INDEX events_createdat_brin ON events USING brin(createdat);
 
 create table location_weather(
     id int generated always as identity,
@@ -71,6 +72,7 @@ CREATE TABLE users
 );
 
 CREATE INDEX users_login_index ON users(login);
+create index users_location_null_idx on users(location) where location is null;
 
 
 CREATE TABLE organization_members

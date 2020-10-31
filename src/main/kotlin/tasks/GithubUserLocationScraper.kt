@@ -12,9 +12,13 @@ import model.RateLimit
 import model.User
 import java.math.RoundingMode
 import java.sql.Connection
+import java.sql.Date
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
@@ -60,17 +64,17 @@ class GithubUserLocationScraper {
 
                     val userData = fetchUser(result.getString("username"))
 
-                    when {
-                        userData == null -> {
-                            flowOf(null)
-                        }
-                        userData.location.isNullOrEmpty() -> {
-                            // println("skip ${userData.login}, no location set")
-                            flowOf(null)
-                        }
-                        else -> {
-                            flowOf(userData)
-                        }
+                    if (userData.code == 404 || userData.location.isNullOrEmpty()) {
+                        flowOf(
+                            User(
+                                id = result.getString("userid").toInt(),
+                                location = userData.location,
+                                login = userData.login,
+                                code = if (userData.code == 404) 404 else 204
+                            )
+                        )
+                    } else {
+                        flowOf(userData)
                     }
                 }
                 .filterNotNull()
@@ -88,21 +92,38 @@ class GithubUserLocationScraper {
         // all events with no or incomplete user
         val query = conn.prepareStatement(
             """
-select e1.userid, e1.username, u1.login stored_login, u1.id stored_userid, u1.location from 
-	(select e.userid, e.username from events e
-	 	where e.type = 'PushEvent'
-		group by e.userid, e.username) e1
-left outer join 
-	(select u.id::text as id, u.login, u.location from users u) u1 
-on u1.id = e1.userid
-where u1.location is null
+    select DISTINCT ON (e1.username) e1.username AS username, e1.userid, u1.login stored_login, u1.id stored_userid, u1.location 
+    from events e1
+    left outer join users u1
+    on u1.id::text = e1.userid
+    where u1.location is null and u1.statuscode != 404 and u1.statuscode != 204
+	and e1.createdat >= ? and e1.createdat < ?
         """.trimIndent()
         )
 
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
         return flow {
-            val result = query.executeQuery()
-            while (result.next()) {
-                emit(result)
+            var startDate = LocalDate.of(2020, 1, 1)
+            val endDate = LocalDate.of(2020, 3, 31)
+
+            while (startDate < endDate) {
+                emit(startDate)
+                startDate = startDate.plusDays(1)
+            }
+        }.flatMapConcat { day ->
+            val startSql = Date.valueOf(formatter.format(day))
+            val endSql = Date.valueOf(formatter.format(day.plusDays(1)))
+            query.setDate(1, startSql)
+            query.setDate(2, endSql)
+
+            println("analyze ${startSql}..${endSql}")
+
+            flow {
+                val result = query.executeQuery()
+                while (result.next()) {
+                    emit(result)
+                }
             }
         }
     }
@@ -134,7 +155,7 @@ where u1.location is null
             val delayMillis = Instant.ofEpochSecond(coreRateLimit.reset)
                 .minusMillis(Instant.now().toEpochMilli())
                 .toEpochMilli()
-            println("wait for ${delayMillis.milliseconds}")
+            println("${LocalDateTime.now()} wait for ${delayMillis.milliseconds}")
             delay(delayMillis)
         }
 //        else {
@@ -142,7 +163,7 @@ where u1.location is null
 //        }
     }
 
-    private fun fetchUser(username: String): User? {
+    private fun fetchUser(username: String): User {
 
         val userResponse = httpGet {
             url("https://api.github.com/users/$username")
@@ -154,8 +175,9 @@ where u1.location is null
 
         if (!userResponse.isSuccessful) {
             if (userResponse.code() == 404) {
-                println("user $username does not exist anymore")
-                return null
+//                println("user $username does not exist anymore")
+                userResponse.body()?.close()
+                return User(id = -1, login = username, location = null, code = 404)
             }
 
             throw IllegalStateException("github users api request failed: " + userResponse.code())
@@ -169,15 +191,16 @@ where u1.location is null
             """
             INSERT INTO users (id, login, location) VALUES (?, ?, ?)
                 ON CONFLICT(id) DO
-                    UPDATE SET location = ?;
+                    UPDATE SET location = ?, statuscode = ?;
             """.trimIndent()
         )
         command.setInt(1, user.id)
         command.setString(2, user.login)
         command.setString(3, user.location)
         command.setString(4, user.location)
+        command.setInt(5, user.code)
         //            command.setDate(4, Date.valueOf(Instant.now().atZone(ZoneId.systemDefault()).toLocalDate()))
-        //            command.setInt(5, userResponse.code())
         return command.executeUpdate()
     }
 }
+

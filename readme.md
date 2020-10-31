@@ -20,16 +20,15 @@ go install
 
 
 ## download raw github archive data
-`$GOPATH/bin/gha-download-files`
+to download parallel: 
+1. adjust months in source
+2. ./build.sh
+3. `$GOPATH/bin/gha-download-files`
 
 
 ## compact, for each day, all PushEvent events into a reduced tsv (csv with tabs)
-/* PushEvent is about 50% of all events, hence its worth to only store PushEvent in tsv files)
 ```shell script
-find data -name *.tsv | xargs rm
-
-$GOPATH/bin/gha-parse-githubarchive/main.go \
-    -path /Users/ueli/repos/gh-geo-activity/data/gh-archive
+$GOPATH/bin/gha-parse-githubarchive -path /Users/ueli/repos/gh-geo-activity/data/gh-archive
 ```
 
 
@@ -42,12 +41,15 @@ docker exec -i gh-analysis-db psql -U github -d github < data/schema.sql
 
 ### import all tsv data into event table
 `./import-gh-archive-tsv.sh`
+REINDEX TABLE events;
 
 
 ## get user details via github api, depends on tsv (THIS REPO)
+REINDEX TABLE locations;
 ```
 --script github-user-location-scraper
 ```
+REINDEX TABLE users;
 
 ## geocode user locations, depends on user-scraper
 ````shell script

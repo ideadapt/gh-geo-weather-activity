@@ -3,7 +3,8 @@ package model
 data class User(
     val id: Int,
     val login: String,
-    val location: String?
+    val location: String?,
+    val code: Int = 200
 )
 
 data class CoreRateLimit(

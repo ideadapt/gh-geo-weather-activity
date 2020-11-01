@@ -58,6 +58,10 @@ $GOPATH/bin/gha-location-scraper
 ````
 => should use https://wiki.openstreetmap.org/wiki/Nominatim#Alternatives_.2F_Third-party_providers
 
+```
+REFRESH MATERIALIZED VIEW cities_in_profiles;
+REFRESH MATERIALIZED VIEW countries_in_profiles;
+```
 
 
 # THIS REPO:
@@ -76,7 +80,7 @@ docker exec -i gh-analysis-db psql -U github -d github < data/import-cities-json
 docker exec -i gh-analysis-db psql -U github -d github < data/views.sql
 ````
 
-## Event weather scraper, depends on user-location-scraper & noaa location scraper
+## Event weather scraper, depends on user-location-scraper & noaa-location-scraper
 
 ```
 --script event-weather-scraper

@@ -12,6 +12,8 @@ import java.sql.Connection
 import java.sql.Date
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 /**
@@ -34,18 +36,13 @@ class EventWeatherScraper {
 
     @FlowPreview
     fun start() {
-        /**
-        for push in pushs_per_day
-        dailyWeather = noaa.getWeather(noaaLocation, push.date)
-        dump(dailyWeather, push, noaaLocation)
-         */
         runBlocking {
             readEvents().flatMapConcat { event ->
 
                 // NCDC quota is max 5 req/s, we do 4 to stay safe
                 delay(250)
 
-                println("\n# model.Weather for ${event.locationId}\n")
+                println("\nget weather for ${event.locationId}\n")
 
                 val response = noaaClient.queryAsync("data", Weather::class.java) {
                     "datasetid" to "GHCND"
@@ -60,7 +57,8 @@ class EventWeatherScraper {
                     e to r
                 }
             }.onEach { (event, page) ->
-                println(page.results.size.toString() + " " + page.results.take(10))
+                println(
+                    page.results.size.toString() + " " + page.results.take(10).map { "${it.datatype}: ${it.value}" })
             }.map { (event, page) ->
                 event to listOf(
                     (page.results.firstOrNull { it.datatype == "PRCP" } ?: Weather(
@@ -92,30 +90,80 @@ class EventWeatherScraper {
                     insert.setDouble(3, it.value)
                     insert.setString(4, event.locationName)
                     insert.setString(5, event.locationId)
-                    val affected = insert.executeUpdate()
-                    println("affected $affected")
+                    insert.executeUpdate()
                 }
             }
         }
     }
 
     private fun readEvents(): Flow<PushsPerDay> {
-        // TODO auto retrieve offset from db if parameterized
-        val result = conn.createStatement().executeQuery("select * from pushs_per_day offset 200;")
-        val format = SimpleDateFormat("yyyy-MM-dd hh:mm:ss")
+        val dayEventsQry = conn.prepareStatement(
+            """
+            SELECT count(e.id),
+                   u.location AS profile_location,
+                   co.shortname AS country,
+                   co.n_id AS country_nid,
+                   ci.n_name AS city,
+                   ci.n_id AS city_nid
+            FROM events e
+                     JOIN users u ON u.id::text = e.userid
+                     FULL JOIN countries_in_profiles co ON co.profile_location = u.location
+                     FULL JOIN cities_in_profiles ci ON ci.profile_location = u.location
+            WHERE (co.n_id IS NOT NULL OR ci.n_id IS NOT NULL)
+            AND createdat >= ? AND createdat < ?
+            GROUP BY country, city, country_nid, city_nid, u.location
+        """.trimIndent()
+        )
 
         return flow {
-            while (result.next()) {
-                val obj = PushsPerDay(
-                    day = format.parse(result.getString("day")),
-                    count = result.getInt("count"),
-                    country = result.getString("country") ?: "",
-                    country_nid = result.getString("country_nid") ?: "",
-                    city = result.getString("city") ?: "",
-                    city_nid = result.getString("city_nid") ?: "",
+            var startDate = LocalDate.of(2020, 2, 6)
+            val endDate = LocalDate.of(2020, 3, 31)
+
+            while (startDate < endDate) {
+                emit(startDate)
+                startDate = startDate.plusDays(1)
+            }
+        }.flatMapConcat { day ->
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+            val startSql = Date.valueOf(formatter.format(day))
+            val endSql = Date.valueOf(formatter.format(day.plusDays(1)))
+            dayEventsQry.setDate(1, startSql)
+            dayEventsQry.setDate(2, endSql)
+
+            println("analyze ${startSql}..${endSql}")
+
+            flow {
+                val result = dayEventsQry.executeQuery()
+                while (result.next()) {
+                    val obj = PushsPerDay(
+                        day = Date.valueOf(formatter.format(day)),
+                        count = result.getInt("count"),
+                        country = result.getString("country") ?: "",
+                        country_nid = result.getString("country_nid") ?: "",
+                        city = result.getString("city") ?: "",
+                        city_nid = result.getString("city_nid") ?: "",
+                    )
+                    emit(obj)
+                }
+            }.filter {
+                val locationWeatherQry = conn.prepareStatement(
+                    """
+             SELECT count(*) as count FROM location_weather lw WHERE
+               lw.day >= ? AND lw.day < ?
+               AND (lw.location_id = ? OR lw.location_id = ?)
+                 """.trimIndent()
                 )
 
-                emit(obj)
+                locationWeatherQry.setDate(1, startSql)
+                locationWeatherQry.setDate(2, endSql)
+                locationWeatherQry.setString(3, it.city_nid)
+                locationWeatherQry.setString(4, it.country_nid)
+
+                val result = locationWeatherQry.executeQuery()
+                when {
+                    result.next() && result.getInt("count") > 0 -> false
+                    else -> true
+                }
             }
         }
     }

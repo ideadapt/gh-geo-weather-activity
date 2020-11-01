@@ -49,32 +49,42 @@ WHERE addr.comp @> '[{"types": ["administrative_area_level_1"]}]'::jsonb
 
 ------------------------------------------------------------------------------------------------------------------------
 
--- ADD NOAA LOCATION FOR EACH EVENT
-CREATE OR REPLACE VIEW events_geocoded
-AS
-SELECT e.id,
-       e.type,
-       e.userid,
-       e.createdat,
+-- GEOCODED EVENTS BY DAY GROUPED BY NOAA LOCATION
+
+SELECT count(e.id),
        u.location AS profile_location,
        co.shortname AS country,
        co.n_id AS country_nid,
        ci.n_name AS city,
        ci.n_id AS city_nid
 FROM events e
-         JOIN users u ON u.id::text = e.userid::text
+         JOIN users u ON u.id::text = e.userid
          FULL JOIN countries_in_profiles co ON co.profile_location = u.location
          FULL JOIN cities_in_profiles ci ON ci.profile_location = u.location
-WHERE co.n_id IS NOT NULL OR ci.n_id IS NOT NULL
-;
+WHERE (co.n_id IS NOT NULL OR ci.n_id IS NOT NULL)
+AND createdat >= '2020-01-01' AND createdat < '2020-01-02'
+GROUP BY country, city, country_nid, city_nid, u.location;
 
 
-------------------------------------------------------------------------------------------------------------------------
+-- TRY AND ERROR:
 
--- GROUP EVENTS BY DAY AND NOAA LOCATION
-CREATE MATERIALIZED VIEW pushs_per_day AS
-select date_trunc('day', createdat) as day, count(id) count, country, country_nid, city, city_nid
-from events_geocoded
-where type = 'PushEvent'
-group by day, country, city, city_nid, country_nid
-;
+select count(*) cnt, lw.location_name, it.profile_location, lw.day, lw.value from location_weather lw
+    JOIN (
+        SELECT e.id,
+               u.location AS profile_location,
+               co.shortname AS country,
+               co.n_id AS country_nid,
+               ci.n_name AS city,
+               ci.n_id AS city_nid
+        FROM events e
+                 JOIN users u ON u.id::text = e.userid
+                 FULL JOIN countries_in_profiles co ON co.profile_location = u.location
+                 FULL JOIN cities_in_profiles ci ON ci.profile_location = u.location
+        WHERE (co.n_id IS NOT NULL OR ci.n_id IS NOT NULL)
+          AND createdat >= '2020-01-05' AND createdat < '2020-01-05'
+    ) it ON (it.city_nid = lw.location_id OR it.country_nid = lw.location_id)
+WHERE datatype = 'PRCP'
+--and location_name = 'FI'
+--AND day >= '2020-01-01' AND day < '2020-01-10'
+GROUP BY lw.location_name, profile_location, lw.day, lw.value
+order by cnt desc;

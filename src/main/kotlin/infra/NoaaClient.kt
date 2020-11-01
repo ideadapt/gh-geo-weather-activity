@@ -42,7 +42,7 @@ class NoaaClient {
                 }
 
                 if (!response.isSuccessful) {
-                    throw IllegalStateException(response.message())
+                    throw IllegalStateException("HTTP response: ${response.code()} ${response.message()}")
                 }
 
                 val type: JavaType =

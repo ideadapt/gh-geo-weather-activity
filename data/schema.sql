@@ -23,6 +23,7 @@ create table location_weather(
     value numeric(7, 2),
     location_name varchar(100),
     location_id varchar(20),
+    count int,
     PRIMARY KEY(id),
     CONSTRAINT location_day UNIQUE (day, location_id, datatype)
 );

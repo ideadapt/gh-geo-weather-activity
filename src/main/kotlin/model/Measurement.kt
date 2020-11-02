@@ -2,7 +2,7 @@ package model
 
 import java.util.*
 
-data class Weather(
+data class Measurement(
     val date: Date,
     val datatype: String,
     val station: String,

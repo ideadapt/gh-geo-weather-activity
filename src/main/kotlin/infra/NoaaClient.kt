@@ -19,7 +19,7 @@ class NoaaClient {
 
     private fun query(path: String, params: ParamContext.() -> Unit): Response {
         return httpGet(client {
-            readTimeout = 15_000
+            readTimeout = 30_000
         }) {
             url(baseUrl + path)
             param(params)
@@ -36,9 +36,11 @@ class NoaaClient {
             while (!complete) {
                 println("start position: $offset")
 
-                val response = query(path) {
-                    params(this)
-                    "offset" to offset
+                val response = retry(times = 3) {
+                    query(path) {
+                        params(this)
+                        "offset" to offset
+                    }
                 }
 
                 if (!response.isSuccessful) {

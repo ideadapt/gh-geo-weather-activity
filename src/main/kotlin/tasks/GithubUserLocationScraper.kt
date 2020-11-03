@@ -1,6 +1,8 @@
 package tasks
 
 import infra.JacksonMapper
+import infra.iterator
+import infra.setLocalDateTime
 import io.github.cdimascio.dotenv.dotenv
 import io.github.rybalkinsd.kohttp.dsl.httpGet
 import io.github.rybalkinsd.kohttp.ext.url
@@ -12,13 +14,11 @@ import model.RateLimit
 import model.User
 import java.math.RoundingMode
 import java.sql.Connection
-import java.sql.Date
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
@@ -97,27 +97,24 @@ class GithubUserLocationScraper {
     left outer join users u1
     on u1.id::text = e1.userid
     where u1.location is null and u1.statuscode != 404 and u1.statuscode != 204
-	and e1.createdat >= ? and e1.createdat < ?
+	and e1.createdat >= ? and e1.createdat <= ?
         """.trimIndent()
         )
 
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-
         return flow {
-            var startDate = LocalDate.of(2020, 1, 1)
+            val startDate = LocalDate.of(2020, 1, 1)
             val endDate = LocalDate.of(2020, 3, 31)
 
-            while (startDate < endDate) {
-                emit(startDate)
-                startDate = startDate.plusDays(1)
+            for (date in startDate..endDate) {
+                val begin = date.atStartOfDay()
+                val end = date.plusDays(1).atStartOfDay().minusSeconds(1)
+                emit(begin to end)
             }
-        }.flatMapConcat { day ->
-            val startSql = Date.valueOf(formatter.format(day))
-            val endSql = Date.valueOf(formatter.format(day.plusDays(1)))
-            query.setDate(1, startSql)
-            query.setDate(2, endSql)
+        }.flatMapConcat { (startDate, endDate) ->
+            query.setLocalDateTime(1, startDate)
+            query.setLocalDateTime(2, endDate)
 
-            println("analyze ${startSql}..${endSql}")
+            println("analyze ${startDate.toLocalDate()}")
 
             flow {
                 val result = query.executeQuery()

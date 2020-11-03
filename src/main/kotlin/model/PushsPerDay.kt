@@ -1,11 +1,10 @@
 package model
 
 import java.sql.ResultSet
-import java.time.format.DateTimeFormatter
-import java.util.*
+import java.time.LocalDateTime
 
 data class PushsPerDay(
-    val day: Date,
+    val day: LocalDateTime,
     val count: Int,
     val country: String,
     val city: String,
@@ -27,9 +26,7 @@ data class PushsPerDay(
     }
 
     companion object {
-        val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-
-        fun fromResult(result: ResultSet, startSql: java.sql.Date): PushsPerDay {
+        fun fromResult(result: ResultSet, startSql: LocalDateTime): PushsPerDay {
             return PushsPerDay(
                 day = startSql,
                 count = result.getInt("count"),

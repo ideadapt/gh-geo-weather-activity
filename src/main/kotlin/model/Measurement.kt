@@ -1,9 +1,9 @@
 package model
 
-import java.util.*
+import java.time.LocalDateTime
 
 data class Measurement(
-    val date: Date,
+    val date: LocalDateTime,
     val datatype: String,
     val station: String,
     val value: Double,

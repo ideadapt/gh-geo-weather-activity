@@ -1,17 +1,17 @@
 import kotlinx.cli.ArgParser
-import kotlinx.cli.ArgType
-import kotlinx.cli.required
+import kotlinx.cli.ExperimentalCli
+import kotlinx.cli.Subcommand
+import kotlinx.coroutines.FlowPreview
 import tasks.EventWeatherScraper
 import tasks.GithubUserLocationScraper
 import tasks.NoaaLocationScraper
 import kotlin.time.ExperimentalTime
 
+@FlowPreview
+@ExperimentalCli
 @ExperimentalTime
 suspend fun main(args: Array<String>) {
     /*
-    gh-weather-stats
-        measure push frequency e.g. per day per region.
-        add weather info to each measurement
 
 Wieviel locations können von google geocoded werden?
     select data, count(*) c from locations group by data order by c desc
@@ -30,32 +30,31 @@ Wieviel google geocoded locations können einer noaa location zugeordnet werden?
      */
 
     val parser = ArgParser("gh-geo-weather-activity")
-    val input by parser.option(
-        ArgType.String, shortName = "s",
-        fullName = "script",
-        description = """Sub routine to run. One of:
-            |   noaa-location-scraper   
-            |   event-weather-scraper
-            |   github-user-location-scraper
-        """.trimMargin()
-    ).required()
-    parser.parse(args)
 
-    when (input) {
-        "noaa-location-scraper" -> {
-            NoaaLocationScraper().start()
-        }
-
-        "event-weather-scraper" -> {
+    class EventWeatherScraperCommand :
+        Subcommand("event-weather-scraper", "Download and store weather measurement data for already stored events.") {
+        override fun execute() {
             EventWeatherScraper().start()
         }
+    }
 
-        "github-user-location-scraper" -> {
-            GithubUserLocationScraper().start()
-        }
-
-        else -> {
-            println("invalid sub command")
+    class NoaaLocationScraperCommand :
+        Subcommand("noaa-location-scraper", "Download and store all available cities and countries from NOAA.") {
+        override fun execute() {
+            NoaaLocationScraper().start()
         }
     }
+
+    class GithubUserLocationScraperCommand : Subcommand(
+        "github-user-location-scraper",
+        "Geocode github user profile location (free text) and store it in a structured format."
+    ) {
+        override fun execute() {
+            GithubUserLocationScraper().start()
+        }
+    }
+
+    parser.subcommands(EventWeatherScraperCommand(), NoaaLocationScraperCommand(), GithubUserLocationScraperCommand())
+
+    parser.parse(args)
 }

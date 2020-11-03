@@ -1,6 +1,8 @@
 package tasks
 
 import infra.NoaaClient
+import infra.iterator
+import infra.setLocalDateTime
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -10,11 +12,10 @@ import model.Measurement
 import model.NoaaResponse
 import model.PushsPerDay
 import java.sql.Connection
-import java.sql.Date
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.LocalDateTime
 import java.util.*
 
 /**
@@ -83,38 +84,34 @@ class EventWeatherScraper {
                      FULL JOIN countries_in_profiles co ON co.profile_location = u.location
                      FULL JOIN cities_in_profiles ci ON ci.profile_location = u.location
             WHERE (co.n_id IS NOT NULL OR ci.n_id IS NOT NULL)
-            AND createdat >= ? AND createdat < ?
+            AND createdat >= ? AND createdat <= ?
             GROUP BY country, city, country_nid, city_nid, u.location
         """.trimIndent()
         )
 
         return flow {
+            // TODO get from cli param
             val startDate = LocalDate.of(2020, 1, 6)
             val endDate = LocalDate.of(2020, 1, 31)
 
-            var batchStartDate = startDate
-            while (batchStartDate < endDate) {
-                val batchEndDate = batchStartDate.plusDays(1)
-                emit(batchStartDate to batchEndDate)
-                batchStartDate = batchEndDate
+            for (date in startDate..endDate) {
+                val begin = date.atStartOfDay()
+                val end = date.plusDays(1).atStartOfDay().minusSeconds(1)
+                emit(begin to end)
             }
         }.flatMapConcat { (startDate, endDate) ->
-            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-            val startSql = Date.valueOf(formatter.format(startDate))
-            val endSql = Date.valueOf(formatter.format(endDate))
-
-            println("analyze ${startSql}..${endSql}")
+            println("analyze ${startDate.toLocalDate()}")
 
             flow {
-                dayEventsQry.setDate(1, startSql)
-                dayEventsQry.setDate(2, endSql)
+                dayEventsQry.setLocalDateTime(1, startDate)
+                dayEventsQry.setLocalDateTime(2, endDate)
                 val result = dayEventsQry.executeQuery()
                 while (result.next()) {
-                    val obj = PushsPerDay.fromResult(result, startSql)
+                    val obj = PushsPerDay.fromResult(result, startDate)
                     emit(obj)
                 }
             }.filter {
-                hasWeatherData(startSql, endSql, it)
+                hasNoWeatherDataYet(startDate, endDate, it)
             }
         }
     }
@@ -140,8 +137,6 @@ class EventWeatherScraper {
     }
 
     private fun storeEventMeasurements(measurements: List<Measurement>, event: PushsPerDay) {
-        val format = SimpleDateFormat("yyyy-MM-dd")
-
         measurements.forEach {
             val sql =
                 """
@@ -150,34 +145,35 @@ class EventWeatherScraper {
                             DO NOTHING;
                             """.trimIndent()
             val insert = conn.prepareStatement(sql)
-            insert.setDate(1, Date.valueOf(format.format(it.date)))
+            insert.setLocalDateTime(1, it.date)
             insert.setString(2, it.datatype)
             insert.setDouble(3, it.value)
             insert.setString(4, event.locationName)
             insert.setString(5, event.locationId)
             insert.setInt(6, event.count)
-            insert.executeUpdate()
+//            insert.executeUpdate()
+            insert.close()
         }
     }
 
-    private fun hasWeatherData(startSql: Date?, endSql: Date?, it: PushsPerDay): Boolean {
+    private fun hasNoWeatherDataYet(startDate: LocalDateTime, endDate: LocalDateTime, it: PushsPerDay): Boolean {
         val locationWeatherQry = conn.prepareStatement(
             """
                          SELECT count(*) as count FROM location_weather lw WHERE
-                           lw.day >= ? AND lw.day < ?
+                           lw.day >= ? AND lw.day <= ?
                            AND (lw.location_id = ? OR lw.location_id = ?)
                      """.trimIndent()
         )
 
-        locationWeatherQry.setDate(1, startSql)
-        locationWeatherQry.setDate(2, endSql)
+        locationWeatherQry.setLocalDateTime(1, startDate)
+        locationWeatherQry.setLocalDateTime(2, endDate)
         locationWeatherQry.setString(3, it.city_nid)
         locationWeatherQry.setString(4, it.country_nid)
 
         val result = locationWeatherQry.executeQuery()
-        return when {
-            result.next() && result.getInt("count") > 0 -> false
-            else -> true
-        }
+        val hasResults = result.next() && result.getInt("count") > 0
+        locationWeatherQry.close()
+
+        return !hasResults
     }
 }

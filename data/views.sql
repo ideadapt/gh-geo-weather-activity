@@ -65,3 +65,14 @@ WHERE (co.n_id IS NOT NULL OR ci.n_id IS NOT NULL)
 AND createdat >= '2020-01-01' AND createdat < '2020-01-02'
 GROUP BY country, city, country_nid, city_nid, u.location;
 
+-- MEASUREMENTS NEXT TO COMMIT COUNT AND LOCATION
+
+-- 58mio in total => 18k geolocated measurements :(
+
+SELECT day, EXTRACT(DOW FROM day) weekday, datatype, value as measurement, location_weather.location_name, location_weather.count as commit_count, counter.count as location_count FROM location_weather
+  LEFT JOIN (
+    SELECT location_name, count(location_name) as count FROM location_weather
+    GROUP BY location_name
+) counter ON counter.location_name = location_weather.location_name
+WHERE datatype = 'PRCP'
+ORDER BY location_count DESC, location_weather.location_name ASC, measurement ASC;

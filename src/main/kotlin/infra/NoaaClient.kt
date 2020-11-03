@@ -20,6 +20,7 @@ class NoaaClient {
     private fun query(path: String, params: ParamContext.() -> Unit): Response {
         return httpGet(client {
             readTimeout = 30_000
+            retryOnConnectionFailure = true
         }) {
             url(baseUrl + path)
             param(params)
@@ -37,14 +38,15 @@ class NoaaClient {
                 println("start position: $offset")
 
                 val response = retry(times = 3) {
-                    query(path) {
+                    val response = query(path) {
                         params(this)
                         "offset" to offset
                     }
-                }
 
-                if (!response.isSuccessful) {
-                    throw IllegalStateException("HTTP response: ${response.code()} ${response.message()}")
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException("HTTP response: ${response.code()} ${response.message()}")
+                    }
+                    response
                 }
 
                 val type: JavaType =

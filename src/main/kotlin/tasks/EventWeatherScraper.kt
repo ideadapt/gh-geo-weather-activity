@@ -14,6 +14,7 @@ import java.sql.Date
 import java.sql.DriverManager
 import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 /**
@@ -88,8 +89,8 @@ class EventWeatherScraper {
         )
 
         return flow {
-            val startDate = LocalDate.of(2020, 2, 11)
-            val endDate = LocalDate.of(2020, 3, 15)
+            val startDate = LocalDate.of(2020, 1, 6)
+            val endDate = LocalDate.of(2020, 1, 31)
 
             var batchStartDate = startDate
             while (batchStartDate < endDate) {
@@ -98,7 +99,7 @@ class EventWeatherScraper {
                 batchStartDate = batchEndDate
             }
         }.flatMapConcat { (startDate, endDate) ->
-            val formatter = SimpleDateFormat("yyyy-MM-dd")
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
             val startSql = Date.valueOf(formatter.format(startDate))
             val endSql = Date.valueOf(formatter.format(endDate))
 
